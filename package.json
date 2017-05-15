@@ -1,0 +1,38 @@
+{
+  "name": "tinyservice",
+  "version": "0.9.1",
+  "description": "Tiny and lightweight nodejs framework for creating microservices via tcp protocol",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/insane-jo/tinyservice.git"
+  },
+  "keywords": [
+    "micro",
+    "service",
+    "microservice",
+    "tcp",
+    "json",
+    "socket",
+    "tcp-server",
+    "tcp-client"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/insane-jo/tinyservice/issues"
+  },
+  "homepage": "https://github.com/insane-jo/tinyservice#readme",
+  "devDependencies": {
+    "jest": "^20.0.1"
+  },
+  "dependencies": {
+    "deep-condition": "^1.0.0",
+    "event-emitter-es6": "^1.1.5",
+    "json-socket": "^0.2.1",
+    "uuid": "^3.0.1"
+  }
+}

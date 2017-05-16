@@ -1,8 +1,9 @@
 const net = require('net');
 const JsonSocket = require('json-socket');
 const uuid = require('uuid');
+const EventEmitter = require('event-emitter-es6');
 
-class TinyServiceClient {
+class TinyServiceClient extends EventEmitter {
     constructor(opts) {
         if (!opts) {
             throw 'Options param must be passed to constructor';
@@ -13,7 +14,14 @@ class TinyServiceClient {
             throw 'Host and Port properties must be specified!';
         }
 
+        super();
+
         this._socket = new net.Socket();
+
+        this._socket.on('connect', (...args) => {
+            this.emit('connect', ...args)
+        });
+
         this._jsonSocket = new JsonSocket(this._socket);
 
         this._socket.connect(port, host);
@@ -26,7 +34,20 @@ class TinyServiceClient {
     }
 
     _onMessage(msg) {
+        let {uid} = msg;
 
+        if (uid) {
+            let systemMessage = msg['$systemMessage$'];
+            if (systemMessage) {
+                if (systemMessage === 'END' && uid in this._pendingAnswers) {
+                    delete this._pendingAnswers[uid];
+                }
+            } else {
+                let {err, data} = msg;
+
+                this._pendingAnswers[uid](err,data);
+            }
+        }
     }
 
     /**
@@ -44,6 +65,11 @@ class TinyServiceClient {
             uid: uid,
             data: pattern
         })
+    }
+
+    close() {
+        this._socket.close();
+        this._socket.unref();
     }
 }
 

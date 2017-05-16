@@ -58,9 +58,11 @@ class TinyServiceServer {
                         if (uid) {
                             socket.sendMessage({
                                 uid,
-                                _systemMessage: 'END'
+                                $systemMessage$: 'END'
                             });
                         }
+                    }).catch((err) => {
+                        console.error(err);
                     });
                 }
             );

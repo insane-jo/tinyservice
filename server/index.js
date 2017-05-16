@@ -26,47 +26,115 @@ class TinyServiceServer {
         this._server = net.createServer();
         this._server.listen(options.port);
 
+        this._subscriptionHandlers = {};
+
         this._server.on('connection', (socket) => {
             socket = new JsonSocket(socket);
 
             socket.on('message',
                 /**
                  * @param message
-                 * @param {?string} uid
-                 * @param {*} data
+                 * @param {?string} message.uid
+                 * @param {*} message.data
+                 * @param {boolean} $subscription$
                  */
                 (message) => {
-                    let {uid, data} = message;
-                    let foundActions = this._getActionsForMessage(data);
-
-                    Promise.all(
-                        foundActions.map((act) =>
-                            new Promise((resolve, reject) => {
-                                act[CALLBACK_PROPERTY_NAME](data, (err, answer) => {
-                                    answer = {
-                                        uid: uid,
-                                        err,
-                                        data: err ? undefined : answer
-                                    };
-                                    socket.sendMessage(answer, () => {
-                                        resolve(true);
-                                    });
-                                })
-                            })
-                        )
-                    ).then(() => {
-                        if (uid) {
-                            socket.sendMessage({
-                                uid,
-                                $systemMessage$: 'END'
-                            });
-                        }
-                    }).catch((err) => {
-                        console.error(err);
-                    });
+                    this._onMessage(socket, message);
                 }
             );
         });
+    }
+
+    _onMessage(socket, message) {
+        let isSubscription = message['$subscription$'];
+
+        if (isSubscription) {
+            let systemMessage = message['$systemMessage$'];
+
+            if (systemMessage === 'END') {
+                this._handleUnsubscribe(socket, message);
+            } else {
+                this._handleSubscription(socket, message);
+            }
+
+        } else {
+
+            this._handleSingleMessage(socket, message);
+
+        }
+    }
+
+    _handleUnsubscribe(socket, message) {
+        let {uid} = message;
+        this._subscriptionHandlers[uid].forEach((cb) => cb());
+
+        delete this._subscriptionHandlers[uid];
+    }
+
+    _handleSubscription(socket, message) {
+        let {uid, data} = message;
+        let foundActions = this._getActionsForMessage(data);
+
+        this._subscriptionHandlers[uid] = [];
+
+        foundActions.forEach((act) => {
+            let addedUnsubscribe = false;
+
+            act[CALLBACK_PROPERTY_NAME](data, (err, answer) => {
+                if (!this._subscriptionHandlers[uid]) {
+                    return console.warn('Emit message to closed subscription');
+                }
+
+                answer = {
+                    uid: uid,
+                    err,
+                    data: err ? undefined : answer,
+                    $subscription$: true
+                };
+                socket.sendMessage(answer);
+            }, (cb) => {
+                addedUnsubscribe = true;
+
+                this._subscriptionHandlers[uid].push(cb);
+            });
+
+            if (!addedUnsubscribe) {
+                throw 'Unsubscribe function must be registered syncronously!';
+            }
+        });
+    }
+
+    _handleSingleMessage(socket, message) {
+
+        let {uid, data} = message;
+        let foundActions = this._getActionsForMessage(data);
+
+        Promise.all(
+            foundActions.map((act) =>
+                new Promise((resolve, reject) => {
+                    act[CALLBACK_PROPERTY_NAME](data, (err, answer) => {
+                        answer = {
+                            uid: uid,
+                            err,
+                            data: err ? undefined : answer
+                        };
+                        socket.sendMessage(answer, () => {
+                            resolve(true);
+                        });
+                    })
+                })
+            )
+        ).then(() => {
+            if (uid) {
+                socket.sendMessage({
+                    uid,
+                    $systemMessage$: 'END'
+                });
+            }
+        }).catch((err) => {
+            console.error(err);
+        });
+
     }
 
     /**
@@ -156,8 +224,8 @@ class TinyServiceServer {
                 Object.keys(pattern).forEach((key) => resultKeys.indexOf(key) === -1 ? resultKeys.push(key) : null);
 
                 return resultKeys.filter((key) => {
-                    return act.hasOwnProperty(key) && pattern.hasOwnProperty(key) && act[key] === pattern[key]
-                }).length === resultKeys.length;
+                        return act.hasOwnProperty(key) && pattern.hasOwnProperty(key) && act[key] === pattern[key]
+                    }).length === resultKeys.length;
             });
         } else {
             let filters = Object.keys(pattern).map((key) => {
@@ -176,12 +244,25 @@ class TinyServiceServer {
         return filteredActions;
     }
 
+    _removeAllSubscriptions() {
+        Object.keys(this._subscriptionHandlers)
+            .forEach((key) => {
+                this._subscriptionHandlers[key].forEach((cb) => cb());
+            });
+
+        this._subscriptionHandlers = {};
+    }
+
     close() {
+        this._removeAllSubscriptions();
+
         this._server.close();
         this._server.unref();
     }
 
     clear() {
+        this._removeAllSubscriptions();
+
         this._eventTypes = [];
     }
 }

@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "deep-condition": "^1.0.0",
+    "deep-equal": "^1.0.1",
     "event-emitter-es6": "^1.1.5",
     "json-socket": "^0.2.1",
     "uuid": "^3.0.1"

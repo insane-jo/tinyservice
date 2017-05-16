@@ -83,3 +83,36 @@ const clientInstance = new Client({
     port: 11234
 });
 ```
+
+### act
+Emits message and handles answers from server
+Params:
+* `{!Object} pattern` - required parameter. Pattern to send message to server.
+* `{Function} callback` - callback, that will be called, when server message will received by this call.
+**EXAMPLE**
+```javascript
+serverInstance.add({
+    a: 1,
+    b: 2
+}, (msg, done) => {
+    done(null, {
+        message: 'This message will be received by client!'
+    })
+});
+
+serverInstance.add({
+    a: 1
+}, (msg, done) => {
+    done(null, {
+        message: 'This message will be received by client too!!!'
+    })    
+});
+
+clientInstance.act({a: 1, b: 2}, (err, msg) => {
+    //This function will be called two times
+    //from both handlers on server
+})
+```
+
+### close
+Closes client instance
